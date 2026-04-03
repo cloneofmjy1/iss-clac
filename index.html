@@ -1553,6 +1553,64 @@ window.addEventListener('keydown', function(event) {
   if (event.key === 'Escape') closeSaveModal();
 });
 
+// ── Wix iframe auto-resize bridge ────────────────────────────────────────────
+(function() {
+  let resizeTimer = null;
+  let lastHeight = 0;
+
+  function getPageHeight() {
+    const body = document.body;
+    const docEl = document.documentElement;
+
+    return Math.max(
+      body ? body.scrollHeight : 0,
+      docEl ? docEl.scrollHeight : 0,
+      body ? body.offsetHeight : 0,
+      docEl ? docEl.offsetHeight : 0,
+      body ? body.clientHeight : 0,
+      docEl ? docEl.clientHeight : 0
+    );
+  }
+
+  function postHeight() {
+    const height = Math.ceil(getPageHeight());
+    if (!height || height === lastHeight || window.parent === window) return;
+
+    lastHeight = height;
+    window.parent.postMessage({
+      type: 'domestiq:resize',
+      height: height
+    }, '*');
+  }
+
+  function queuePostHeight() {
+    window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(postHeight, 75);
+  }
+
+  window.addEventListener('load', queuePostHeight);
+  window.addEventListener('resize', queuePostHeight);
+  window.addEventListener('orientationchange', queuePostHeight);
+
+  if ('ResizeObserver' in window) {
+    const resizeObserver = new ResizeObserver(queuePostHeight);
+    if (document.body) resizeObserver.observe(document.body);
+    if (document.documentElement) resizeObserver.observe(document.documentElement);
+  } else if ('MutationObserver' in window && document.body) {
+    const mutationObserver = new MutationObserver(queuePostHeight);
+    mutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true
+    });
+  }
+
+  // Catch late layout shifts from fonts, async paint, and conditional UI changes.
+  window.setTimeout(queuePostHeight, 150);
+  window.setTimeout(queuePostHeight, 500);
+  window.setTimeout(queuePostHeight, 1200);
+})();
+
 // ── Synchronized scroll ───────────────────────────────────────────────────────
 (function() {
   const rightPane = document.querySelector('.sticky-results');

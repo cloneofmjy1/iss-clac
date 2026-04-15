@@ -814,7 +814,6 @@ const REPORT_CONTEXT = {
   clientName: ''
 };
 
-// ── Calculation ───────────────────────────────────────────────────────────────
 function calcCat(cat) {
   const idx = RIDX[state.rackingType];
   const tbl = (cat==='module' && state.usWafer) ? SH.withWafer[cat] : SH.noWafer[cat];
@@ -1314,13 +1313,13 @@ function generatePDF() {
   // DomestIQ logo — right-aligned
   const logoBoxY = 98;
   const logoRightEdge = pageW - margin;
-  const domestiqLogoW = 72;
+  const domestiqLogoW = 124;
   const domestiqLogoH = domestiqLogoW * (214 / 500);
   if (DOMESTIQ_LOGO_DATA_URI) {
-    doc.addImage(DOMESTIQ_LOGO_DATA_URI, 'PNG', logoRightEdge - domestiqLogoW, logoBoxY - 7, domestiqLogoW, domestiqLogoH);
+    doc.addImage(DOMESTIQ_LOGO_DATA_URI, 'PNG', logoRightEdge - domestiqLogoW, logoBoxY - 14, domestiqLogoW, domestiqLogoH);
   } else {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(14);
     doc.setTextColor('#70797a');
     doc.text('DomestIQ', logoRightEdge, logoBoxY + 10, { align: 'right' });
   }

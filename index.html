@@ -232,12 +232,12 @@
 
   /* Header logo sizing/treatment */
   body > header {
-    height: 4rem !important;
+    height: 4.5rem !important;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
   }
   body > header img[alt="DomestIQ"] {
-    height: 60px !important;
+    height: 68px !important;
     width: auto;
     background: transparent !important;
     padding: 0 !important;
@@ -247,10 +247,10 @@
   }
   @media (max-width: 640px) {
     body > header {
-      height: 4rem !important;
+      height: 4.5rem !important;
     }
     body > header img[alt="DomestIQ"] {
-      height: 44px !important;
+      height: 52px !important;
     }
   }
 
@@ -1193,9 +1193,13 @@ function drawLabelValue(doc, x, y, label, value, width) {
 
 function drawComponentColumn(doc, x, y, width, cat, results) {
   const earned = results.res[cat] || 0;
+  const idx = RIDX[state.rackingType];
+  const tbl = (cat === 'module' && state.usWafer) ? SH.withWafer[cat] : SH.noWafer[cat];
   const entries = Object.keys(LABELS[cat]).map(key => ({
+    key,
     label: LABELS[cat][key],
-    selected: state[cat][key] === true
+    selected: state[cat][key] === true,
+    pct: (tbl && tbl[key]) ? tbl[key][idx] : 0
   }));
 
   // Category header with underline
@@ -1213,13 +1217,22 @@ function drawComponentColumn(doc, x, y, width, cat, results) {
   const rowSpacing = 13;
   let rowY = y + 26;
   entries.forEach(entry => {
+    // Label
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor('#404849');
     doc.text(entry.label, x, rowY);
+
+    // Percentage text — green if selected, light grey otherwise
+    const pctText = entry.pct > 0 ? entry.pct.toFixed(1) + '%' : '—';
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(entry.selected ? '#006e19' : '#bfc8c9');
+    doc.text(pctText, x + width - 14, rowY, { align: 'right' });
+
+    // Indicator circle
     const cy = rowY - 3;
     if (entry.selected) {
-      // Filled green circle with white checkmark drawn as lines
       doc.setFillColor('#006e19');
       const cx = x + width - 6;
       doc.circle(cx, cy, 5, 'F');
@@ -1228,7 +1241,6 @@ function drawComponentColumn(doc, x, y, width, cat, results) {
       doc.line(cx - 2.5, cy - 0.5, cx - 0.5, cy + 2);
       doc.line(cx - 0.5, cy + 2, cx + 3, cy - 2);
     } else {
-      // Outlined grey circle
       doc.setDrawColor('#bfc8c9');
       doc.setLineWidth(1);
       doc.circle(x + width - 6, cy, 5, 'S');
@@ -1258,7 +1270,16 @@ function generatePDF() {
   const pageH = 792;
   const margin = 40;
   const contentW = pageW - margin * 2;
-  const reference = getReportReference(issuedDate);
+  const RACKING_LABELS = {
+    groundTracking: 'Ground: Tracking',
+    groundFixed: 'Ground: Fixed Tilt',
+    rooftopMLPE: 'Rooftop: MLPE',
+    rooftopString: 'Rooftop: String'
+  };
+  const projectTypeText = RACKING_LABELS[state.rackingType] || '—';
+  const projectSizeText = (state.blend.projectSizeMW > 0)
+    ? `${(+state.blend.projectSizeMW).toLocaleString(undefined, { maximumFractionDigits: 2 })} MW`
+    : '—';
   const thresholdText = `${results.threshold}% (FY${state.year})`;
   const gapText = results.gap >= 0
     ? `+${results.gap.toFixed(1)}% above`
@@ -1270,31 +1291,32 @@ function generatePDF() {
   doc.rect(0, 0, pageW, pageH, 'F');
 
   // Header
+  const headerH = 92;
   doc.setFillColor('#00383c');
-  doc.rect(0, 0, pageW, 68, 'F');
-  // Imperial Star logo on left — keep native aspect ratio
-  const imperialLogoW = 168;
+  doc.rect(0, 0, pageW, headerH, 'F');
+  // Imperial Star logo on left — keep native aspect ratio, enlarged
+  const imperialLogoW = 260;
   const imperialLogoH = imperialLogoW * (415 / 2160);
-  const imperialLogoY = (68 - imperialLogoH) / 2;
+  const imperialLogoY = (headerH - imperialLogoH) / 2;
   try {
     doc.addImage(IMPERIAL_STAR_LOGO_B64, 'PNG', margin, imperialLogoY, imperialLogoW, imperialLogoH);
   } catch(e) {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
+    doc.setFontSize(22);
     doc.setTextColor('#ffffff');
-    doc.text('Imperial Star', margin, 28);
+    doc.text('Imperial Star', margin, 44);
   }
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.setTextColor('#53e15a');
-  doc.text('Domestic Content Report', pageW - margin, 28, { align: 'right' });
+  doc.text('Domestic Content Report', pageW - margin, 40, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor('#85c1c7');
-  doc.text(`CONFIDENTIAL | REPORT #${reference}`, pageW - margin, 42, { align: 'right' });
+  doc.text('CONFIDENTIAL', pageW - margin, 56, { align: 'right' });
 
   // Project identity
-  let y = 90;
+  let y = 114;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor('#70797a');
@@ -1305,13 +1327,20 @@ function generatePDF() {
   doc.text(projectName, margin, y + 28);
 
   const metaY = y + 48;
-  const metaWidth = 140;
-  drawLabelValue(doc, margin, metaY, 'Client', clientName, metaWidth);
-  drawLabelValue(doc, margin + 150, metaY, 'Issued Date', formatLongDate(issuedDate), metaWidth);
-  drawLabelValue(doc, margin + 300, metaY, 'Reference', 'IRS Notice 25-08', metaWidth);
+  const metaFields = [
+    ['Client', clientName],
+    ['Project Size', projectSizeText],
+    ['Project Type', projectTypeText],
+    ['Issued Date', formatLongDate(issuedDate)]
+  ];
+  const metaWidth = 120;
+  const metaStep = (contentW - metaWidth) / (metaFields.length - 1);
+  metaFields.forEach(([label, value], i) => {
+    drawLabelValue(doc, margin + metaStep * i, metaY, label, value, metaWidth);
+  });
 
   // DomestIQ logo — right-aligned
-  const logoBoxY = 98;
+  const logoBoxY = 122;
   const logoRightEdge = pageW - margin;
   const domestiqLogoW = 124;
   const domestiqLogoH = domestiqLogoW * (214 / 500);
@@ -1327,10 +1356,10 @@ function generatePDF() {
   // Divider below project identity
   doc.setDrawColor('#ebeeef');
   doc.setLineWidth(0.5);
-  doc.line(margin, 165, pageW - margin, 165);
+  doc.line(margin, 188, pageW - margin, 188);
 
   // Hero section — no box, open layout
-  y = 180;
+  y = 204;
   // "DOMESTIC CONTENT" label
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
@@ -1431,13 +1460,13 @@ function generatePDF() {
   doc.text(results.threshold + '%', thresholdX, barY + 24, { align: 'center' });
 
   // Divider below hero
-  y = 296;
+  y = 320;
   doc.setDrawColor('#ebeeef');
   doc.setLineWidth(0.5);
   doc.line(margin, y, pageW - margin, y);
 
   // Component breakdown
-  y = 312;
+  y = 336;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor('#70797a');

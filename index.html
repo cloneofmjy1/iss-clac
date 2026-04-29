@@ -1191,6 +1191,39 @@ function drawLabelValue(doc, x, y, label, value, width) {
   doc.text(lines, x, y + 12);
 }
 
+function fitFontSizeToWidth(doc, text, maxWidth, maxFontSize, minFontSize) {
+  let fontSize = maxFontSize;
+  doc.setFontSize(fontSize);
+  while (fontSize > minFontSize && doc.getTextWidth(text) > maxWidth) {
+    fontSize -= 1;
+    doc.setFontSize(fontSize);
+  }
+  return fontSize;
+}
+
+function clampLinesToFit(doc, lines, maxWidth, maxLines) {
+  if (lines.length <= maxLines) return lines;
+  const fitted = lines.slice(0, maxLines);
+  let lastLine = `${fitted[maxLines - 1]}...`;
+  while (lastLine.length > 4 && doc.getTextWidth(lastLine) > maxWidth) {
+    lastLine = `${lastLine.slice(0, -4).trimEnd()}...`;
+  }
+  fitted[maxLines - 1] = lastLine;
+  return fitted;
+}
+
+function drawProjectTitle(doc, x, y, title, maxWidth) {
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor('#00383c');
+  const fontSize = fitFontSizeToWidth(doc, title, maxWidth, 32, 22);
+  const lines = clampLinesToFit(doc, doc.splitTextToSize(title, maxWidth), maxWidth, 2);
+  const lineHeight = fontSize * 0.95;
+  lines.forEach((line, index) => {
+    doc.text(line, x, y + index * lineHeight);
+  });
+  return (lines.length - 1) * lineHeight;
+}
+
 function drawComponentColumn(doc, x, y, width, cat, results) {
   const earned = results.res[cat] || 0;
   const idx = RIDX[state.rackingType];
@@ -1316,17 +1349,19 @@ function generatePDF() {
   doc.text('CONFIDENTIAL', pageW - margin, 56, { align: 'right' });
 
   // Project identity
+  const logoBoxY = 122;
+  const logoRightEdge = pageW - margin;
+  const domestiqLogoW = 124;
+  const domestiqLogoH = domestiqLogoW * (214 / 500);
+  const titleMaxW = logoRightEdge - domestiqLogoW - margin - 18;
   let y = 114;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor('#70797a');
   doc.text('PROJECT DETAIL', margin, y);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(32);
-  doc.setTextColor('#00383c');
-  doc.text(projectName, margin, y + 28);
+  const titleExtraH = drawProjectTitle(doc, margin, y + 28, projectName, titleMaxW);
 
-  const metaY = y + 48;
+  const metaY = y + 48 + titleExtraH;
   const metaFields = [
     ['Client', clientName],
     ['Project Size', projectSizeText],
@@ -1340,10 +1375,6 @@ function generatePDF() {
   });
 
   // DomestIQ logo — right-aligned
-  const logoBoxY = 122;
-  const logoRightEdge = pageW - margin;
-  const domestiqLogoW = 124;
-  const domestiqLogoH = domestiqLogoW * (214 / 500);
   if (DOMESTIQ_LOGO_DATA_URI) {
     doc.addImage(DOMESTIQ_LOGO_DATA_URI, 'PNG', logoRightEdge - domestiqLogoW, logoBoxY - 14, domestiqLogoW, domestiqLogoH);
   } else {
@@ -1356,10 +1387,11 @@ function generatePDF() {
   // Divider below project identity
   doc.setDrawColor('#ebeeef');
   doc.setLineWidth(0.5);
-  doc.line(margin, 188, pageW - margin, 188);
+  const identityDividerY = 188 + titleExtraH;
+  doc.line(margin, identityDividerY, pageW - margin, identityDividerY);
 
   // Hero section — no box, open layout
-  y = 204;
+  y = 204 + titleExtraH;
   // "DOMESTIC CONTENT" label
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);

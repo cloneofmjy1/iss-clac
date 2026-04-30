@@ -842,6 +842,7 @@ function computeResults() {
   const maxTotal = cats.reduce((s, c) => s + calcMax(c), 0);
   const { domesticPct, domesticPrice, importPrice, projectSizeMW } = state.blend;
   const blendActive = domesticPct < 100;
+  const pricingActive = domesticPrice > 0 || importPrice > 0 || projectSizeMW > 0;
   const rawModule = res.module || 0;
   const blendedModule = rawModule * domesticPct / 100;
   const bosTotal = cats.filter(c => c !== 'module').reduce((s, c) => s + (res[c] || 0), 0);
@@ -866,6 +867,7 @@ function computeResults() {
     importPrice,
     projectSizeMW,
     blendActive,
+    pricingActive,
     blendDC,
     blendPrice,
     blendCost,
@@ -887,6 +889,7 @@ function render() {
     res,
     maxTotal,
     blendActive,
+    pricingActive,
     blendDC,
     blendPrice,
     blendCost,
@@ -961,7 +964,7 @@ function render() {
 
   // Blend panel
   const bp = document.getElementById('blendResPanel');
-  if (blendActive) {
+  if (blendActive || pricingActive) {
     bp.classList.remove('hidden');
     document.getElementById('blendDCVal').textContent = blendDC.toFixed(1) + '%';
     document.getElementById('blendPriceVal').textContent = '$' + blendPrice.toFixed(3) + '/W';
